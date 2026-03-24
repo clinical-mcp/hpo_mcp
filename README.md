@@ -158,6 +158,16 @@ From the folder containing `Dockerfile`:
 docker build -t hpo-mcp:latest .
 ```
 
+If you want to build directly from GitHub instead of cloning first:
+
+```bash
+docker build -t hpo-mcp:latest https://github.com/clinical-mcp/hpo_mcp.git
+```
+
+> Note: `https://github.com/clinical-mcp/hpo_mcp.git` is the **source repository URL**.
+> Docker/Unraid typically wants a **container image repository** (for example Docker Hub or GHCR),
+> not a Git URL, unless you are explicitly building the image from source.
+
 ### Run (persist data, download if missing)
 
 This mounts a host folder to `/data` so `hp.json` is cached between restarts.
@@ -191,6 +201,70 @@ When running in Docker SSE mode, endpoint is:
 If tunneling with ngrok, use:
 
 `https://<your-ngrok-domain>/sse`
+
+### Unraid install
+
+If you want to host this MCP server on an Unraid server, the easiest approach is to run it as a custom Docker container.
+
+#### Option 1: Use a published Docker image
+
+If you publish this image to Docker Hub or GitHub Container Registry, use that image name in Unraid's **Repository** field.
+
+Examples:
+
+```text
+yourdockerhubuser/hpo-mcp:latest
+ghcr.io/clinical-mcp/hpo-mcp:latest
+```
+
+#### Option 2: Build from the GitHub repository
+
+If you do not have a published image yet, first build it from source:
+
+```bash
+docker build -t hpo-mcp:latest https://github.com/clinical-mcp/hpo_mcp.git
+```
+
+You can then tag and push it to a registry, or use the locally built image on the Docker host where it was built.
+
+#### Unraid container settings
+
+In Unraid:
+
+1. Go to **Docker** -> **Add Container**.
+2. Set the container to use either your published image or your locally available image.
+3. Use these recommended settings:
+
+- **Network Type:** `bridge`
+- **Port mapping:** host `8000` -> container `8000`
+- **AppData path:** map `/mnt/user/appdata/hpo-mcp` -> `/data`
+
+Add these environment variables:
+
+```text
+HPO_MCP_TRANSPORT=sse
+HPO_MCP_HOST=0.0.0.0
+HPO_MCP_PORT=8000
+HPO_JSON_PATH=/data/hp.json
+HPO_MCP_AUTO_DOWNLOAD=true
+HPO_MCP_REFRESH_ON_START=false
+```
+
+On first startup, the container will try to download `hp.json` into `/data` if it is not already present.
+
+#### Unraid endpoint
+
+After the container starts, the MCP SSE endpoint should be available at:
+
+```text
+http://<your-unraid-ip>:8000/sse
+```
+
+For internet-facing access, it is recommended to put this behind a reverse proxy or tunnel and use:
+
+```text
+https://<your-domain>/sse
+```
 
 ---
 
