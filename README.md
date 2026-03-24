@@ -150,6 +150,71 @@ ngrok is usually best for development/testing, while cloud hosting is better for
 
 This repo includes a `Dockerfile` and `.dockerignore`.
 
+### Install as a Docker container
+
+You can run this project directly as a Docker container in either of these ways:
+
+#### Option 1: Pull a prebuilt image from GitHub Container Registry
+
+If a published image is available, pull it with:
+
+```bash
+docker pull ghcr.io/clinical-mcp/hpo-mcp:latest
+```
+
+Then run it:
+
+```bash
+docker run --rm -p 8000:8000 \
+  -v hpo_mcp_data:/data \
+  -e HPO_MCP_TRANSPORT=sse \
+  -e HPO_MCP_HOST=0.0.0.0 \
+  -e HPO_MCP_PORT=8000 \
+  -e HPO_JSON_PATH=/data/hp.json \
+  -e HPO_MCP_AUTO_DOWNLOAD=true \
+  -e HPO_MCP_REFRESH_ON_START=false \
+  ghcr.io/clinical-mcp/hpo-mcp:latest
+```
+
+> If the GHCR package is private, you must either make the package public in GitHub
+> package settings or log in first with `docker login ghcr.io` before pulling.
+
+#### Option 2: Build the image locally from this repository
+
+Clone the repository and build it locally:
+
+```bash
+git clone https://github.com/clinical-mcp/hpo_mcp.git
+cd hpo_mcp
+docker build -t hpo-mcp:latest .
+```
+
+Then run it:
+
+```bash
+docker run --rm -p 8000:8000 \
+  -v hpo_mcp_data:/data \
+  -e HPO_MCP_TRANSPORT=sse \
+  -e HPO_MCP_HOST=0.0.0.0 \
+  -e HPO_MCP_PORT=8000 \
+  -e HPO_JSON_PATH=/data/hp.json \
+  -e HPO_MCP_AUTO_DOWNLOAD=true \
+  -e HPO_MCP_REFRESH_ON_START=false \
+  hpo-mcp:latest
+```
+
+#### What this does
+
+- publishes the MCP server on port `8000`
+- stores `hp.json` in `/data` so it persists across restarts
+- serves the SSE endpoint at `/sse`
+
+After the container starts, the MCP endpoint is:
+
+```text
+http://localhost:8000/sse
+```
+
 ### Build image
 
 From the folder containing `Dockerfile`:
