@@ -14,6 +14,10 @@ It exposes stable tools that work with any MCP-compatible LLM client (Claude Des
   - `stdio` (local MCP client integration)
   - `sse` (remote/http use, can be exposed via ngrok)
 - Configurable via environment variables
+- Hybrid HPO search:
+  - exact/normalized lexical matching for precision
+  - local TF-IDF/ngram vector search for typo-tolerant approximate matching
+  - optional embedding-based semantic search with `sentence-transformers`
 
 ---
 
@@ -42,12 +46,41 @@ You can set these environment variables:
 - `HPO_JSON_URL` (default: `http://purl.obolibrary.org/obo/hp.json`)
 - `HPO_MCP_AUTO_DOWNLOAD` (default: `true`; download if missing)
 - `HPO_MCP_REFRESH_ON_START` (default: `false`; force redownload each startup)
+- `HPO_MCP_SEARCH_MODE` (`hybrid`, `lexical`, or `vector`; default: `hybrid`)
+- `HPO_MCP_SEARCH_LIMIT` (default: `15`)
+- `HPO_MCP_VECTOR_MIN_SCORE` (default: `0.08`)
+- `HPO_MCP_VECTOR_BACKEND` (`tfidf`, `semantic`, or `auto`; default: `tfidf`)
+- `HPO_MCP_SEMANTIC_MODEL` (default: `sentence-transformers/all-MiniLM-L6-v2`)
 
 If `HPO_JSON_PATH` is not set, the server looks for:
 1. `hp.json` next to `hpo_mcp.py`
 2. `hp.json` in the current working directory
 
 If no local file is found and `HPO_MCP_AUTO_DOWNLOAD=true`, it will download `hp.json` from `HPO_JSON_URL`.
+
+---
+
+## Search behavior
+
+`search_hpo_terms(query)` uses `HPO_MCP_SEARCH_MODE=hybrid` by default.
+
+Hybrid search keeps deterministic exact HPO ID/name/synonym matches at the top, then adds vector-ranked matches over the term name, synonyms, and definition text. The default vector backend is dependency-free TF-IDF with word, phrase, and character n-gram features.
+
+For true embedding-based semantic search, install the optional dependency:
+
+```bash
+pip install sentence-transformers
+# or:
+pip install -r requirements-semantic.txt
+```
+
+Then run with:
+
+```cmd
+set HPO_MCP_VECTOR_BACKEND=semantic && python hpo_mcp.py
+```
+
+Use `HPO_MCP_VECTOR_BACKEND=auto` to try semantic embeddings and fall back to the local TF-IDF vector index if the model/dependency is unavailable.
 
 ---
 
@@ -175,9 +208,6 @@ docker run --rm -p 8000:8000 \
   -e HPO_MCP_REFRESH_ON_START=false \
   ghcr.io/clinical-mcp/hpo-mcp:latest
 ```
-
-> If the GHCR package is private, you must either make the package public in GitHub
-> package settings or log in first with `docker login ghcr.io` before pulling.
 
 #### Option 2: Build the image locally from this repository
 
