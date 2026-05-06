@@ -104,6 +104,121 @@ The server builds parent/child graph indexes from OBO JSON `edges` when availabl
 
 ---
 
+## Deployment options
+
+You can use this project in two main ways:
+
+1. **Docker/MCP server** — best when you want a running MCP service reachable by MCP clients over `stdio` or `sse`.
+2. **Snowflake Python UDFs** — best when you want to call HPO lookup functions directly from Snowflake SQL, Snowpark, Cortex, notebooks, or AI/ML workflows.
+
+---
+
+## Snowflake implementation
+
+Use this option when you want HPO lookup inside Snowflake rather than a separate Docker/MCP service.
+
+### What Snowflake gets
+
+The Snowflake template creates direct SQL-callable Python UDFs:
+
+- `HPO_SEARCH_TERMS(query, limit_num)`
+- `HPO_TERM_DETAILS(hpo_id)`
+- `HPO_PARENTS(hpo_id)`
+- `HPO_CHILDREN(hpo_id)`
+
+These functions wrap `hpo_functions.py`, a pure-Python implementation with no MCP dependency. Results are returned as JSON strings, so use `PARSE_JSON(...)` in SQL when you want Snowflake `VARIANT` output.
+
+### 1. Prepare files
+
+Make sure you have:
+
+- `hpo_functions.py`
+- `snowflake_hpo_udfs.sql`
+- `hp.json`
+
+If you do not already have `hp.json`, download it from the HPO/OBO URL:
+
+```text
+http://purl.obolibrary.org/obo/hp.json
+```
+
+### 2. Upload files to a Snowflake stage
+
+From SnowSQL/Snowflake CLI, in the directory containing the files:
+
+```sql
+CREATE STAGE IF NOT EXISTS HPO_MCP_STAGE;
+
+PUT file://hpo_functions.py @HPO_MCP_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+PUT file://hp.json          @HPO_MCP_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+```
+
+### 3. Create the UDFs
+
+Run the SQL template:
+
+```sql
+-- Run the contents of:
+-- snowflake_hpo_udfs.sql
+```
+
+The template uses Snowflake Python UDF staged imports:
+
+```sql
+IMPORTS = ('@HPO_MCP_STAGE/hpo_functions.py', '@HPO_MCP_STAGE/hp.json')
+```
+
+### 4. Call from Snowflake SQL / AI/ML workflows
+
+```sql
+SELECT PARSE_JSON(HPO_SEARCH_TERMS('seizure', 10));
+SELECT PARSE_JSON(HPO_TERM_DETAILS('HP:0001250'));
+SELECT PARSE_JSON(HPO_PARENTS('HP:0001250'));
+SELECT PARSE_JSON(HPO_CHILDREN('HP:0001250'));
+```
+
+Example over a table of clinical notes:
+
+```sql
+SELECT
+  patient_id,
+  note_text,
+  PARSE_JSON(HPO_SEARCH_TERMS(note_text, 10)) AS hpo_matches
+FROM clinical_notes;
+```
+
+### Updating HPO data in Snowflake
+
+To refresh HPO data:
+
+```sql
+PUT file://hp.json @HPO_MCP_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
+```
+
+Then rerun `snowflake_hpo_udfs.sql` so the UDF imports point at the refreshed staged file.
+
+### Snowflake notes
+
+- This mode does **not** require a running MCP server.
+- The staged `hp.json` keeps UDF execution network-free.
+- The UDFs use the local TF-IDF/ngram vector search from `hpo_functions.py`.
+- For true embedding semantic search fully inside Snowflake, prefer Snowflake Cortex/vector features or an embedding table. Avoid loading large sentence-transformer models inside scalar UDFs unless you have tested performance and package availability.
+
+---
+
+## Direct Python usage
+
+For environments that cannot use MCP directly, `hpo_functions.py` exposes direct-call Python functions with no MCP dependency:
+
+```python
+from hpo_functions import search_hpo_terms, get_hpo_term_details
+
+print(search_hpo_terms("seizure", limit=10, hp_json_path="hp.json"))
+print(get_hpo_term_details("HP:0001250", hp_json_path="hp.json"))
+```
+
+---
+
 ## Run
 
 ### Windows (cmd)
