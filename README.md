@@ -10,6 +10,17 @@ It exposes stable tools that work with any MCP-compatible LLM client (Claude Des
 - Stable MCP tools:
   - `search_hpo_terms(query: str)`
   - `get_hpo_term_details(hpo_id: str)`
+  - `refresh_hpo_data(force: bool = true)`
+  - `get_hpo_parents(hpo_id: str)`
+  - `get_hpo_children(hpo_id: str)`
+  - `get_hpo_ancestors(hpo_id: str, max_depth: int | null = null)`
+  - `get_hpo_descendants(hpo_id: str, max_depth: int | null = null)`
+  - `map_clinical_text_to_hpo(text: str, limit: int = 20)`
+  - `suggest_more_specific_terms(hpo_id: str, query: str | null = null, limit: int = 15)`
+  - `suggest_broader_terms(hpo_id: str, limit: int = 15)`
+  - `compare_hpo_terms(hpo_ids: list[str])`
+  - `validate_hpo_ids(hpo_ids: list[str])`
+  - `get_hpo_subontology(root_hpo_id: str, max_depth: int = 2)`
 - Supports both transports:
   - `stdio` (local MCP client integration)
   - `sse` (remote/http use, can be exposed via ngrok)
@@ -46,6 +57,7 @@ You can set these environment variables:
 - `HPO_JSON_URL` (default: `http://purl.obolibrary.org/obo/hp.json`)
 - `HPO_MCP_AUTO_DOWNLOAD` (default: `true`; download if missing)
 - `HPO_MCP_REFRESH_ON_START` (default: `false`; force redownload each startup)
+- `HPO_MCP_MAX_DATA_AGE_HOURS` (default: `24`; auto-refresh stale local `hp.json` on startup; set `0` to disable age-based refresh)
 - `HPO_MCP_SEARCH_MODE` (`hybrid`, `lexical`, or `vector`; default: `hybrid`)
 - `HPO_MCP_SEARCH_LIMIT` (default: `15`)
 - `HPO_MCP_VECTOR_MIN_SCORE` (default: `0.08`)
@@ -57,6 +69,8 @@ If `HPO_JSON_PATH` is not set, the server looks for:
 2. `hp.json` in the current working directory
 
 If no local file is found and `HPO_MCP_AUTO_DOWNLOAD=true`, it will download `hp.json` from `HPO_JSON_URL`.
+
+With the defaults, an existing local `hp.json` is refreshed on startup when it is at least 24 hours old. Set `HPO_MCP_REFRESH_ON_START=true` to redownload on every startup, or call the MCP tool `refresh_hpo_data(force=true)` to refresh immediately and rebuild the search indexes without restarting.
 
 ---
 
@@ -81,6 +95,19 @@ set HPO_MCP_VECTOR_BACKEND=semantic && python hpo_mcp.py
 ```
 
 Use `HPO_MCP_VECTOR_BACKEND=auto` to try semantic embeddings and fall back to the local TF-IDF vector index if the model/dependency is unavailable.
+
+---
+
+## Ontology navigation tools
+
+The server builds parent/child graph indexes from OBO JSON `edges` when available. This enables:
+
+- direct navigation: `get_hpo_parents`, `get_hpo_children`
+- broader/narrower expansion: `get_hpo_ancestors`, `get_hpo_descendants`
+- compact trees for UI/context: `get_hpo_subontology`
+- clinical mapping: `map_clinical_text_to_hpo`
+- ID hygiene: `validate_hpo_ids`
+- relatedness checks: `compare_hpo_terms`
 
 ---
 
@@ -135,6 +162,9 @@ After starting the server, test in your client by calling:
 
 - `search_hpo_terms("seizure")`
 - `get_hpo_term_details("HP:0001250")`
+- `refresh_hpo_data(true)`
+- `get_hpo_children("HP:0001250")`
+- `map_clinical_text_to_hpo("developmental delay, seizures, short stature")`
 
 ---
 
