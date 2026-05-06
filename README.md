@@ -28,7 +28,7 @@ It exposes stable tools that work with any MCP-compatible LLM client (Claude Des
 - Hybrid HPO search:
   - exact/normalized lexical matching for precision
   - local TF-IDF/ngram vector search for typo-tolerant approximate matching
-  - optional embedding-based semantic search with `sentence-transformers`
+  - embedding-based semantic search with `sentence-transformers`
 
 ---
 
@@ -80,21 +80,14 @@ With the defaults, an existing local `hp.json` is refreshed on startup when it i
 
 Hybrid search keeps deterministic exact HPO ID/name/synonym matches at the top, then adds vector-ranked matches over the term name, synonyms, and definition text. The default vector backend is dependency-free TF-IDF with word, phrase, and character n-gram features.
 
-For true embedding-based semantic search, install the optional dependency:
-
-```bash
-pip install sentence-transformers
-# or:
-pip install -r requirements-semantic.txt
-```
-
-Then run with:
+For true embedding-based semantic search, install the standard dependencies from the combined `requirements.txt`, then run with:
 
 ```cmd
+pip install -r requirements.txt
 set HPO_MCP_VECTOR_BACKEND=semantic && python hpo_mcp.py
 ```
 
-Use `HPO_MCP_VECTOR_BACKEND=auto` to try semantic embeddings and fall back to the local TF-IDF vector index if the model/dependency is unavailable.
+Use `HPO_MCP_VECTOR_BACKEND=auto` to try semantic embeddings and fall back to the local TF-IDF vector index if the model or dependency is unavailable.
 
 ---
 
